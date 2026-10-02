@@ -65,6 +65,9 @@ parse_git_status() {
     [ $modified -eq 1 ] && symbols+="*"
     [ $untracked -eq 1 ] && symbols+="?"
 
+    # Set checkmark (✔) when working tree is completely clean
+    [ -z "$symbols" ] && symbols="✔"
+
     # Assemble upstream tracking counters (⇡ = ahead, ⇣ = behind)
     local sync=""
     [ "$ahead" -gt 0 ] 2>/dev/null && sync+="⇡${ahead}"
@@ -132,8 +135,10 @@ update_prompt() {
         # Branch base text in darker blue (\e[38;5;32m)
         GIT_BRANCH=$'\e[38;5;35m├─(\e[38;5;32mgit:'"$branch_str"
         
-        # Uncommitted status indicators in vibrant orange (\e[38;5;208m)
-        if [ -n "$symbols_str" ]; then
+        # Status indicators (Green for clean ✔, Orange for active changes +*?)
+        if [ "$symbols_str" = "✔" ]; then
+            GIT_BRANCH+=$' \e[38;5;35m✔'
+        elif [ -n "$symbols_str" ]; then
             GIT_BRANCH+=$' \e[38;5;208m'"$symbols_str"
         fi
         
