@@ -1,0 +1,177 @@
+# ==============================================================================
+# Dynamic Multi-Line Bash Prompt Configuration
+# Structure: Header (Metadata/Timer) -> Conditional Rows (Git/Venv) -> Input Line
+# ==============================================================================
+
+# Disable standard Python virtual environment prompt modification
+export VIRTUAL_ENV_DISABLE_PROMPT=1
+
+# ------------------------------------------------------------------------------
+# Function: parse_git_status
+# Purpose:  Inspects current repository state using fast porcelain status output.
+# Returns:  Colon-separated string (branch|action:symbols:sync_counts)
+# ------------------------------------------------------------------------------
+parse_git_status() {
+    # Check if we are inside a Git repository working tree
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return
+
+    # Extract current branch name, falling back to short commit hash if detached
+    local branch
+    branch=$(git branch --show-current 2>/dev/null)
+    [ -z "$branch" ] && branch=$(git rev-parse --short HEAD 2>/dev/null)
+
+    # Detect active multi-step Git operations
+    local git_dir
+    git_dir=$(git rev-parse --git-dir 2>/dev/null)
+    local state=""
+    if [ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ]; then
+        state="|REBASE"
+    elif [ -f "$git_dir/MERGE_HEAD" ]; then
+        state="|MERGE"
+    elif [ -f "$git_dir/CHERRY_PICK_HEAD" ]; then
+        state="|CHERRY-PICK"
+    fi
+
+    # Retrieve porcelain v2 status output (tracks staged, modified, untracked, & ahead/behind)
+    local status_out
+    status_out=$(git status --porcelain=v2 --branch 2>/dev/null)
+
+    local staged=0 modified=0 untracked=0 ahead=0 behind=0
+
+    # Parse status line by line
+    while IFS= read -r line; do
+        case "$line" in
+            "# branch.ab "*)
+                # Extract ahead (+) and behind (-) commit counts relative to upstream
+                ahead=$(echo "$line" | awk '{print $3}' | tr -d '+')
+                behind=$(echo "$line" | awk '{print $4}' | tr -d '-')
+                ;;
+            "1 "*|"2 "*)
+                # Ordinary / renamed tracked files: inspect XY status codes
+                local xy="${line:2:2}"
+                [ "${xy:0:1}" != "." ] && staged=1
+                [ "${xy:1:1}" != "." ] && modified=1
+                ;;
+            "? "*)
+                # Untracked files present
+                untracked=1
+                ;;
+        esac
+    done <<< "$status_out"
+
+    # Assemble status symbols (+ = staged, * = modified, ? = untracked)
+    local symbols=""
+    [ $staged -eq 1 ] && symbols+="+"
+    [ $modified -eq 1 ] && symbols+="*"
+    [ $untracked -eq 1 ] && symbols+="?"
+
+    # Assemble upstream tracking counters (⇡ = ahead, ⇣ = behind)
+    local sync=""
+    [ "$ahead" -gt 0 ] 2>/dev/null && sync+="⇡${ahead}"
+    [ "$behind" -gt 0 ] 2>/dev/null && sync+="⇣${behind}"
+
+    # Return formatted raw component values
+    echo "${branch}${state}:${symbols}:${sync}"
+}
+
+# ------------------------------------------------------------------------------
+# Functions: Command Duration Timer (DEBUG Trap)
+# Purpose:  Measures command execution duration and constructs formatted string.
+# ------------------------------------------------------------------------------
+
+# Store starting timestamp in seconds when a command initiates
+timer_start() {
+    [ -z "$timer" ] && timer=$SECONDS
+}
+
+# Calculate total execution time on command completion
+timer_stop() {
+    if [ -n "$timer" ]; then
+        local delta=$((SECONDS - timer))
+        # Display timer only if command duration is 1 second or longer
+        if [ $delta -ge 1 ]; then
+            local hours=$((delta / 3600))
+            local minutes=$(((delta % 3600) / 60))
+            local seconds=$((delta % 60))
+            
+            # Construct timer indicator in vibrant orange (\e[38;5;208m)
+            TIMEDELTA=$'(\e[38;5;208m⏱ '
+            [ $hours -gt 0 ] && TIMEDELTA+="${hours}h "
+            [ $minutes -gt 0 ] && TIMEDELTA+="${minutes}m "
+            TIMEDELTA+="${seconds}s"$'\e[38;5;35m)'
+        else
+            TIMEDELTA=""
+        fi
+        unset timer
+    else
+        TIMEDELTA=""
+    fi
+}
+
+# Execute timer_start immediately before running any command
+trap 'timer_start' DEBUG
+
+# ------------------------------------------------------------------------------
+# Function: update_prompt
+# Purpose:  Main PROMPT_COMMAND function called prior to rendering each prompt.
+# ------------------------------------------------------------------------------
+update_prompt() {
+    local exit_code=$?
+    timer_stop
+
+    # Terminal shell integration escape sequence (FTCS exit status)
+    EXIT_SEQ=$'\e]133;D;'${exit_code}$'\a'
+
+    # Build conditional Git branch row
+    local git_info
+    git_info=$(parse_git_status)
+
+    if [ -n "$git_info" ]; then
+        IFS=":" read -r branch_str symbols_str sync_str <<< "$git_info"
+        
+        # Branch base text in darker blue (\e[38;5;32m)
+        GIT_BRANCH=$'\e[38;5;35m├─(\e[38;5;32mgit:'"$branch_str"
+        
+        # Uncommitted status indicators in vibrant orange (\e[38;5;208m)
+        if [ -n "$symbols_str" ]; then
+            GIT_BRANCH+=$' \e[38;5;208m'"$symbols_str"
+        fi
+        
+        # Upstream ahead/behind counters in warm yellow (\e[38;5;220m)
+        if [ -n "$sync_str" ]; then
+            GIT_BRANCH+=$' \e[38;5;220m'"$sync_str"
+        fi
+
+        GIT_BRANCH+=$'\e[38;5;35m)\n'
+    else
+        GIT_BRANCH=""
+    fi
+
+    # Build conditional Python Virtual Environment row in vibrant orange (\e[38;5;208m)
+    if [ -n "$VIRTUAL_ENV" ]; then
+        local venv_name
+        venv_name=$(basename "$VIRTUAL_ENV")
+        VENV_PROMPT=$'\e[38;5;35m├─(\e[38;5;208mvenv:'"$venv_name"$'\e[38;5;35m)\n'
+    else
+        VENV_PROMPT=""
+    fi
+}
+
+# Assign prompt update hook to execute before PS1 evaluation
+PROMPT_COMMAND=update_prompt
+
+# ------------------------------------------------------------------------------
+# Main PS1 Structure Definition
+# Breakdown:
+#   \[$EXIT_SEQ\]                 - Shell integration exit status
+#   \[\e]133;A\a\]                - Shell integration prompt start marker
+#   \[\e[0m\]                     - Text formatting reset
+#   \[\e[38;5;35m\]╭─(...)       - Top branch line structure in medium green
+#   \[\e[38;5;38m\]\t / \j / \H / \w - Metadata elements in bright cyan
+#   ${TIMEDELTA}\n               - Dynamic timer string + newline
+#   ${GIT_BRANCH}${VENV_PROMPT}   - Dynamic Git & Virtualenv rows (if active)
+#   \[\e[38;5;35m\]╰─            - Input line branch structure in medium green
+#   \[\e[38;5;38m\]❯_            - Terminal prompt symbol in bright cyan
+#   \[\e[0m\]\[\e]133;B\a\]         - Formatting reset + command start marker
+# ------------------------------------------------------------------------------
+export PS1='\[$EXIT_SEQ\]\[\e]133;A\a\]\[\e[0m\]\[\e[38;5;35m\]╭─(\[\e[38;5;38m\]\t\[\e[38;5;35m\])-(\[\e[38;5;38m\]\j\[\e[38;5;35m\])-(\[\e[38;5;38m\]\H\[\e[38;5;35m\])-(\[\e[38;5;38m\]\w\[\e[38;5;35m\])${TIMEDELTA}\n${GIT_BRANCH}${VENV_PROMPT}\[\e[38;5;35m\]╰─\[\e[38;5;38m\]❯_\[\e[0m\]\[\e]133;B\a\] '
