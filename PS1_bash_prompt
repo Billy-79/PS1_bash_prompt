@@ -1,6 +1,6 @@
 # ==============================================================================
-# Dynamic Multi-Line Bash Prompt Configuration
-# Structure: Header (Metadata/Timer) -> Conditional Rows (Git/Venv) -> Input Line
+# Dynamic Multi-Line Native Bash Prompt Configuration
+# Structure: Header (Metadata/Timer) -> Conditional Rows (Chroot/Git/Venv) -> Input Line
 # ==============================================================================
 
 # Disable standard Python virtual environment prompt modification so we can
@@ -50,14 +50,12 @@ parse_git_status() {
         case "$line" in
             "# branch.ab "*)
                 # Parse ahead (+) and behind (-) commit counts relative to upstream
-                # tokens array: [0]="#", [1]="branch.ab", [2]="+ahead", [3]="-behind"
                 local tokens=($line)
                 ahead="${tokens[2]#+}"
                 behind="${tokens[3]#-}"
                 ;;
             "1 "*|"2 "*)
-                # Parse tracked files (ordinary or renamed): tokens[1] contains XY status flags
-                # X represents index/staged status; Y represents working tree/modified status
+                # Parse tracked files (ordinary or renamed)
                 local tokens=($line)
                 local xy="${tokens[1]}"
                 [ "${xy:0:1}" != "." ] && staged=1
@@ -144,16 +142,27 @@ update_prompt() {
     timer_stop
 
     # Declare prompt component variables globally so PS1 can read them directly
-    declare -g GIT_BRANCH="" VENV_PROMPT="" EXIT_SEQ=""
+    declare -g GIT_BRANCH="" VENV_PROMPT="" DEBIAN_CHROOT_PROMPT="" EXIT_SEQ=""
 
     # Construct FTCS terminal shell integration sequence for command exit status
     EXIT_SEQ=$'\e]133;D;'${exit_code}$'\a'
+
+    # Safely evaluate Debian/Ubuntu chroot indicator without global scope pollution
+    local chroot_val="${debian_chroot:-}"
+    if [ -z "$chroot_val" ] && [ -r /etc/debian_chroot ]; then
+        chroot_val=$(cat /etc/debian_chroot)
+    fi
+
+    # Build dynamic Debian Chroot prompt line in magenta (\e[38;5;201m)
+    if [ -n "$chroot_val" ]; then
+        DEBIAN_CHROOT_PROMPT=$'\e[38;5;35m├─(\e[38;5;201mchroot:'"$chroot_val"$'\e[38;5;35m)\n'
+    fi
 
     # Build dynamic Git status prompt line
     local git_info
     git_info=$(parse_git_status)
 
-    if [ -n "$git_info" ]; then
+    if [[ -n "$git_info" ]]; then
         local branch_str="" symbols_str="" sync_str=""
         
         # Extract components safely using parameter expansion
@@ -166,14 +175,15 @@ update_prompt() {
         GIT_BRANCH=$'\e[38;5;35m├─(\e[38;5;32mgit:'"$branch_str"
         
         # Apply green color (\e[38;5;35m) for clean checkmark or orange (\e[38;5;208m) for active changes
-        if [ "$symbols_str" = "✔" ]; then
+        # Native [[ ... ]] prevents globbing leaks on '*' or '?' symbols
+        if [[ "$symbols_str" == "✔" ]]; then
             GIT_BRANCH+=$' \e[38;5;35m✔'
-        elif [ -n "$symbols_str" ]; then
+        elif [[ -n "$symbols_str" ]]; then
             GIT_BRANCH+=$' \e[38;5;208m'"$symbols_str"
         fi
         
         # Format upstream ahead/behind sync counters in warm yellow (\e[38;5;220m)
-        if [ -n "$sync_str" ]; then
+        if [[ -n "$sync_str" ]]; then
             GIT_BRANCH+=$' \e[38;5;220m'"$sync_str"
         fi
 
@@ -194,22 +204,25 @@ PROMPT_COMMAND=update_prompt
 # ------------------------------------------------------------------------------
 # Main PS1 Structure Definition
 # Non-printing sequence brackets \[\...\] wrap ANSI escape codes to prevent cursor offset & line-wrapping bugs.
-# Breakdown of ANSI codes and bash escape sequences used below:
-#   \[$EXIT_SEQ\]             - Final Term command exit status OSC sequence (\e]133;D;<code>\a)
-#   \[\e]133;A\a\]            - Final Term prompt start OSC sequence (marks beginning of prompt)
-#   \[\e[0m\]                 - Reset all text attributes, colors, and formatting
-#   \[\e[38;5;35m\]           - Set foreground color to 256-color green (Code 35) for prompt borders
-#   ╭─(...)                   - Structural multi-line box characters
-#   \[\e[38;5;38m\]           - Set foreground color to 256-color cyan (Code 38) for metadata
-#   \t                        - Current time in 24-hour HH:MM:SS format
-#   \j                        - Number of active background job instances
-#   \H                        - Full hostname of the operating system
-#   \w                        - Current working directory path (~ for home)
-#   ${TIMEDELTA}              - Evaluated command duration block (orange: \e[38;5;208m)
-#   \n                        - Line break to push Git/Venv/Input rows down
-#   ${GIT_BRANCH}${VENV_PROMPT} - Dynamic secondary status lines built in update_prompt
-#   ╰─                        - Terminal prompt bottom connector string
-#   ❯_                        - Terminal prompt symbol
-#   \[\e]133;B\a\]            - Final Term command start OSC sequence (marks beginning of user input)
+# Sequence Breakdown:
+#   \[$EXIT_SEQ\]                 - OSC 133;D;<code>\a : Reports previous command exit status code to terminal
+#   \[\e[0m\]                     - Resets text attributes before starting prompt region
+#   \[\e]133;A\a\]                - OSC 133;A : Marks official start of prompt region for terminal shell integration
+#   \[\e[38;5;35m\]               - 256-color green (Code 35) for structural box borders
+#   ╭─(...)                       - Multi-line box connector characters
+#   \[\e[38;5;38m\]               - 256-color cyan (Code 38) for metadata tokens
+#   \t                            - Current time in 24-hour HH:MM:SS format
+#   \j                            - Count of active background job instances
+#   \u@\H                         - Logged-in user and full hostname
+#   \w                            - Current working directory path
+#   ${TIMEDELTA}                  - Execution duration string (orange)
+#   \n                            - Line break
+#   ${DEBIAN_CHROOT_PROMPT}       - Dynamic chroot status line built in update_prompt (magenta: \e[38;5;201m)
+#   ${GIT_BRANCH}                 - Dynamic Git status line built in update_prompt
+#   ${VENV_PROMPT}                - Dynamic Python Virtual Environment line built in update_prompt (orange: \e[38;5;208m)
+#   ╰─                            - Prompt bottom connector line
+#   ❯_                            - Prompt input symbol
+#   \[\e[0m\]                     - Resets colors for user command entry
+#   \[\e]133;B\a\]                - OSC 133;B : Marks start of user input line for terminal prompt navigation
 # ------------------------------------------------------------------------------
-export PS1='\[$EXIT_SEQ\]\[\e]133;A\a\]\[\e[0m\]\[\e[38;5;35m\]╭─(\[\e[38;5;38m\]\t\[\e[38;5;35m\])-(\[\e[38;5;38m\]\j\[\e[38;5;35m\])-(\[\e[38;5;38m\]\H\[\e[38;5;35m\])-(\[\e[38;5;38m\]\w\[\e[38;5;35m\])${TIMEDELTA}\n${GIT_BRANCH}${VENV_PROMPT}\[\e[38;5;35m\]╰─\[\e[38;5;38m\]❯_\[\e[0m\]\[\e]133;B\a\] '
+export PS1='\[$EXIT_SEQ\]\[\e[0m\]\[\e]133;A\a\]\[\e[38;5;35m\]╭─(\[\e[38;5;38m\]\t\[\e[38;5;35m\])-(\[\e[38;5;38m\]\j\[\e[38;5;35m\])-(\[\e[38;5;38m\]\u@\H\[\e[38;5;35m\])-(\[\e[38;5;38m\]\w\[\e[38;5;35m\])${TIMEDELTA}\n${DEBIAN_CHROOT_PROMPT}${GIT_BRANCH}${VENV_PROMPT}\[\e[38;5;35m\]╰─\[\e[38;5;38m\]❯_\[\e[0m\]\[\e]133;B\a\] '
