@@ -35,11 +35,13 @@ A lightweight, pure-Bash custom prompt featuring command execution timing, smart
 
 The prompt dynamically expands across multiple rows based on your current workspace state:
 
+```text
 ╭─(HH:MM:SS)-(jobs)-(user@hostname)-(cwd) (⏱ duration)
 ├─(chroot:name)
 ├─(git:branch state status sync)
 ├─(venv:name)
 ╰─❯_
+```
 
 1. Header Line (Primary Status)
 
