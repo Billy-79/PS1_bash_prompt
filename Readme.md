@@ -31,7 +31,6 @@ A lightweight, pure-Bash custom prompt featuring command execution timing, smart
 
 ---
 
-
 ## Breakdown of the Prompt Structure
 
 The prompt dynamically expands across multiple rows based on your current workspace state:
