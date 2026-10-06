@@ -81,15 +81,16 @@ The prompt dynamically expands across multiple rows based on your current worksp
 
 ## Customization & Color Palette
 
-Colors are implemented using 256-color ANSI escape sequences (\e[38;5;<COLOR>m). You can customize the look by tweaking the code values inside PS1_bash_prompt:
+Colors are implemented using 256-color ANSI escape sequences (`\e[38;5;<COLOR>m`). You can customize the look by tweaking the code values inside `PS1_bash_prompt`:
 
-Component       Color Name      ANSI Code       Visual Role
-Structure       Medium Green    35              Box borders (╭─, ├─, ╰─) and brackets
-Metadata        Bright Cyan     38              Time, background jobs, user@hostname, path, input prompt (❯_)
-Chroot          Magenta         201             Active Debian/Ubuntu chroot context (chroot:name)
-Git Branch      Dark Blue       32              Branch names and git label (git:main)
-Alerts/Timer    Vibrant Orange  208             Command duration (⏱ 2s), dirty state flags (+*?), venv label
-Git Sync        Warm Yellow     220             Upstream ahead/behind counts (⇡1, ⇣2)
+| Component | Color Name | ANSI Code | Visual Role |
+| :--- | :--- | :--- | :--- |
+| **Structure** | Medium Green | `35` | Box borders (`╭─`, `├─`, `╰─`) and brackets |
+| **Metadata** | Bright Cyan | `38` | Time, background jobs, `user@hostname`, path, input prompt (`❯_`) |
+| **Chroot** | Magenta | `201` | Active Debian/Ubuntu chroot context (`chroot:name`) |
+| **Git Branch** | Dark Blue | `32` | Branch names and git label (`git:main`) |
+| **Alerts / Timer** | Vibrant Orange | `208` | Command duration (`⏱ 2s`), dirty state flags (`+*?`), venv label |
+| **Git Sync** | Warm Yellow | `220` | Upstream ahead/behind counts (`⇡1`, `⇣2`) |
 
 ---
 
