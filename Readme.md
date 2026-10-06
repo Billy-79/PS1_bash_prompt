@@ -4,13 +4,13 @@ A lightweight, pure-Bash custom prompt featuring command execution timing, smart
 
 ## Highlights & Features
 
-⚡ Pure Bash & Distribution Agnostic: No Rust, Go, or Python dependencies required. Built strictly on native Bash builtins and POSIX utilities for 100% universal portability across Arch, Debian, Ubuntu, Fedora, Alpine, and macOS.
-⏱ Command Execution Timer: Tracks and displays how long long-running commands take (`≥ 1s`) in real-time.
-🔀 Smart Git Status: Uses fast `git status --porcelain=v2` to render branch info, active operation states (`REBASE`, `MERGE`, `CHERRY-PICK`), uncommitted changes (`+`, `*`, `?`, `✔`), and upstream sync offsets (`⇡ahead`, `⇣behind`).
-📦 Debian/Ubuntu Chroot Detection: Automatically displays active `/etc/debian_chroot` or `$debian_chroot` environment indicators on supported systems without side effects on non-Debian distributions.
-🐍 Python Virtual Environment Integration: Automatically displays the active `venv` name on a dedicated row without cluttering your primary input line.
-🛡 Native Readline & Globbing Safety: Fully wrapped ANSI sequences prevent cursor alignment bugs. Uses native Bash `[[ ... ]]` conditional logic to strictly guard against directory globbing leaks when working with wildcards (`*`, `?`).
-🖥 Shell Integration Ready: Built-in Final Term Command Sequences (FTCS `OSC 133`) for modern terminal navigation (WezTerm, iTerm2, VS Code, GNOME Terminal, Kitty).
+* **⚡ Pure Bash & Distribution Agnostic:** No Rust, Go, or Python dependencies required. Built strictly on native Bash builtins and POSIX utilities for 100% universal portability across Arch, Debian, Ubuntu, Fedora, Alpine, and macOS.
+* **⏱ Command Execution Timer:** Tracks and displays how long long-running commands take (`≥ 1s`) in real-time.
+* **🔀 Smart Git Status:** Uses fast `git status --porcelain=v2` to render branch info, active operation states (`REBASE`, `MERGE`, `CHERRY-PICK`), uncommitted changes (`+`, `*`, `?`, `✔`), and upstream sync offsets (`⇡ahead`, `⇣behind`).
+* **📦 Debian/Ubuntu Chroot Detection:** Automatically displays active `/etc/debian_chroot` or `$debian_chroot` environment indicators on supported systems without side effects on non-Debian distributions.
+* **🐍 Python Virtual Environment Integration:** Automatically displays the active `venv` name on a dedicated row without cluttering your primary input line.
+* **🛡 Native Readline & Globbing Safety:** Fully wrapped ANSI sequences prevent cursor alignment bugs. Uses native Bash `[[ ... ]]` conditional logic to strictly guard against directory globbing leaks when working with wildcards (`*`, `?`).
+* **🖥 Shell Integration Ready:** Built-in Final Term Command Sequences (FTCS `OSC 133`) for modern terminal navigation (WezTerm, iTerm2, VS Code, GNOME Terminal, Kitty).
 
 ---
 
@@ -95,6 +95,6 @@ Git Sync        Warm Yellow     220             Upstream ahead/behind counts (�
 
    • Testing the Chroot Indicator: You can verify the Debian chroot row in any shell session by running export debian_chroot="test". To remove it, run unset debian_chroot.
 
-   • Line-wrapping or history scroll issues? Ensure your terminal emulator supports standard 256-color ANSI escape codes and UTF-8 box characters (╭, ╰, ├, ❯_, ⏱, ✔, ⇡, ⇣).
+   • Line-wrapping or history scroll issues? Ensure your terminal emulator supports standard 256-color ANSI escape codes and UTF-8 box characters (╭, ╰, ├, ❯, ⏱, ✔, ⇡, ⇣).
 
    • Python virtual environment not updating? The script exports VIRTUAL_ENV_DISABLE_PROMPT=1 so that standard Python activate scripts do not override or corrupt your custom prompt layout.
